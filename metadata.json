@@ -1,6 +1,6 @@
 {
   "name": "VyaparMitra AI",
-  "description": "Gemma-powered voice assistant converting informal Gujarati and Gujlish instructions into structured tasks, financial tracking (expenses & gains), payment reminders, and Gujarati WhatsApp follow-ups.",
+  "description": "Gemma-powered voice assistant converting informal Gujarati and Gujlish instructions into structured tasks, financial tracking (expenses & gains), payment reminders, and Gujarati WhatsApp follow-ups with real-time Cloud Firestore database persistence.",
   "requestFramePermissions": [
     "microphone"
   ],

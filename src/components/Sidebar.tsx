@@ -7,6 +7,7 @@ import {
   ShoppingBag,
   TrendingUp,
   Database,
+  Cloud,
   HelpCircle,
   Users,
   Sparkles,
@@ -170,19 +171,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Quick Database Insights Box */}
         <div className="p-3.5 rounded-2xl bg-gradient-to-b from-white/[0.05] to-transparent border border-white/[0.08] space-y-2.5">
           <div className="flex items-center justify-between text-[11px]">
-            <span className="text-slate-400 flex items-center gap-1.5 font-medium">
-              <Database className="w-3.5 h-3.5 text-emerald-400" />
-              SQLite Database
+            <span className="text-slate-300 flex items-center gap-1.5 font-semibold">
+              <Cloud className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+              Cloud Firestore
             </span>
-            <span className="flex items-center gap-1 text-[10px] text-emerald-400 font-mono font-bold">
+            <span className="flex items-center gap-1 text-[10px] text-emerald-400 font-mono font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              Live
+              Live Sync
             </span>
           </div>
 
           <div className="space-y-1 text-xs">
             <div className="flex justify-between text-slate-300">
-              <span className="text-slate-500 text-[11px]">Total Records</span>
+              <span className="text-slate-500 text-[11px]">Synced Records</span>
               <span className="font-mono font-bold text-white">{taskCount}</span>
             </div>
             <div className="flex justify-between text-slate-300">

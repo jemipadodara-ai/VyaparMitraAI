@@ -17,6 +17,8 @@ import {
   updateTaskStatusInDb,
   deleteTaskFromDb,
   clearUserTasksInDb,
+  subscribeToTasks,
+  subscribeToUsers,
 } from './services/api';
 import {
   Sparkles,
@@ -24,6 +26,7 @@ import {
   Users,
   Trash2,
   Database,
+  Cloud,
   Mic,
   FileEdit,
   Zap,
@@ -119,17 +122,29 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Sync Users from SQLite Backend on Mount
+  // Sync Users from Cloud Firestore and SQLite on Mount
   useEffect(() => {
     fetchUsersFromDb().then((dbUsers) => {
       if (dbUsers && dbUsers.length > 0) {
         setAllUsers(dbUsers);
         localStorage.setItem('vyaparmitra_all_users', JSON.stringify(dbUsers));
       } else {
-        // Seed default users into SQL DB
+        // Seed default users
         DEFAULT_USERS.forEach((u) => createUserInDb(u));
       }
     });
+
+    // Real-time listener for user profile updates
+    const unsubscribeUsers = subscribeToUsers((cloudUsers) => {
+      if (cloudUsers && cloudUsers.length > 0) {
+        setAllUsers(cloudUsers);
+        localStorage.setItem('vyaparmitra_all_users', JSON.stringify(cloudUsers));
+      }
+    });
+
+    return () => {
+      unsubscribeUsers();
+    };
   }, []);
 
   // Save All Users list to localStorage
@@ -141,14 +156,14 @@ export default function App() {
     }
   }, [allUsers]);
 
-  // When active currentUser changes, load their private task database from SQLite + LocalStorage
+  // When active currentUser changes, load and subscribe to private task database in Cloud Firestore + SQLite
   useEffect(() => {
     if (!currentUser) return;
     localStorage.setItem('vyaparmitra_active_user_id', currentUser.id);
 
-    // Fetch from SQLite DB
+    // Initial fetch from Cloud Firestore / SQLite
     fetchTasksFromDb(currentUser.id).then((dbTasks) => {
-      if (dbTasks) {
+      if (dbTasks && dbTasks.length > 0) {
         setTasks(dbTasks);
         localStorage.setItem(`vyaparmitra_tasks_${currentUser.id}`, JSON.stringify(dbTasks));
       } else {
@@ -161,6 +176,18 @@ export default function App() {
       }
       setCurrentTask(null);
     });
+
+    // Real-time subscription to Cloud Firestore tasks
+    const unsubscribeTasks = subscribeToTasks(currentUser.id, (cloudTasks) => {
+      if (cloudTasks && cloudTasks.length >= 0) {
+        setTasks(cloudTasks);
+        localStorage.setItem(`vyaparmitra_tasks_${currentUser.id}`, JSON.stringify(cloudTasks));
+      }
+    });
+
+    return () => {
+      unsubscribeTasks();
+    };
   }, [currentUser]);
 
   // Save tasks to user's private local storage whenever updated
@@ -196,7 +223,7 @@ export default function App() {
   // Clear current user's database
   const handleClearUserDatabase = async () => {
     if (!currentUser) return;
-    if (window.confirm(`Clear all SQL database records for "${currentUser.businessName}"? This cannot be undone.`)) {
+    if (window.confirm(`Clear all database records for "${currentUser.businessName}"? This cannot be undone.`)) {
       await clearUserTasksInDb(currentUser.id);
       setTasks([]);
       setCurrentTask(null);
@@ -224,7 +251,7 @@ export default function App() {
     }, 100);
   };
 
-  // Save current card to registry board & SQLite DB
+  // Save current card to registry board & Cloud Firestore + SQLite DB
   const handleSaveTaskToBoard = async (taskToSave: ExtractedTaskData) => {
     if (currentUser) {
       await saveTaskToDb(currentUser.id, taskToSave);
@@ -242,7 +269,7 @@ export default function App() {
 
   // Update task status from Board
   const handleUpdateTaskStatus = async (taskId: string, newStatus: TaskStatus) => {
-    await updateTaskStatusInDb(taskId, newStatus);
+    await updateTaskStatusInDb(taskId, newStatus, currentUser?.id);
     setTasks((prev) =>
       prev.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t))
     );
@@ -253,7 +280,7 @@ export default function App() {
 
   // Delete task from Board
   const handleDeleteTask = async (taskId: string) => {
-    await deleteTaskFromDb(taskId);
+    await deleteTaskFromDb(taskId, currentUser?.id);
     setTasks((prev) => prev.filter((t) => t.id !== taskId));
     if (currentTask && currentTask.id === taskId) {
       setCurrentTask(null);
@@ -313,9 +340,9 @@ export default function App() {
                   <span>•</span>
                   <span>Phone: {currentUser?.phoneNumber || 'N/A'}</span>
                   <span>•</span>
-                  <span className="inline-flex items-center gap-1.5 font-mono text-[11px] text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
-                    <Database className="w-3 h-3 text-emerald-400" />
-                    SQLite DB Active ({tasks.length} Records)
+                  <span className="inline-flex items-center gap-1.5 font-mono text-[11px] text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20 shadow-sm">
+                    <Cloud className="w-3 h-3 text-emerald-400 animate-pulse" />
+                    Cloud Firestore (Live Sync • {tasks.length} Records)
                   </span>
                 </p>
               </div>
@@ -528,6 +555,11 @@ export default function App() {
             <span className="flex items-center gap-1.5 font-mono">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
               Gemma Engine: <span className="text-emerald-400 font-bold">Operational</span>
+            </span>
+            <span className="hidden sm:inline">•</span>
+            <span className="flex items-center gap-1.5 font-mono">
+              <Cloud className="w-3 h-3 text-emerald-400" />
+              Cloud Database: <span className="text-emerald-400 font-bold">Firestore (Connected)</span>
             </span>
             <span className="hidden sm:inline">•</span>
             <span className="font-mono">Gujarati Speech TTS: <span className="text-emerald-400 font-bold">Active</span></span>

@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "VyaparMitra AI Database Schema",
+  "description": "Firestore database blueprint for VyaparMitra AI business profiles and vernacular audio/text tasks",
+  "entities": {
+    "users": {
+      "collection": "users",
+      "description": "Business profiles and merchant accounts",
+      "fields": {
+        "id": { "type": "string", "description": "Unique business account ID" },
+        "businessName": { "type": "string", "description": "Name of the shop or business enterprise" },
+        "ownerName": { "type": "string", "description": "Owner or merchant name" },
+        "phoneNumber": { "type": "string", "description": "10-digit WhatsApp/Phone contact" },
+        "pin": { "type": "string", "description": "Optional security PIN" },
+        "businessType": { "type": "string", "enum": ["Retailer", "Wholesaler", "Manufacturer", "Service / Contractor", "Other"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "businessName", "ownerName"]
+    },
+    "tasks": {
+      "collection": "users/{userId}/tasks",
+      "description": "Customer orders, payment reminders, delivery requests, and Gujarati WhatsApp notifications",
+      "fields": {
+        "id": { "type": "string", "description": "Task identifier" },
+        "userId": { "type": "string", "description": "Associated business owner ID" },
+        "customerName": { "type": "string", "description": "Extracted customer or supplier name" },
+        "actionType": { "type": "string", "enum": ["Order", "Payment Reminder", "Delivery Instruction", "Customer Follow-up", "Task"] },
+        "summary": { "type": "string", "description": "English summary" },
+        "summaryGujarati": { "type": "string", "description": "Gujarati script summary" },
+        "itemsQuantity": { "type": "string", "description": "Quantity and line item description" },
+        "amount": { "type": "number", "description": "Numeric transaction value in INR" },
+        "formattedAmount": { "type": "string", "description": "Formatted INR currency string" },
+        "paymentStatus": { "type": "string", "enum": ["Pending", "Partial", "Paid", "Not Applicable"] },
+        "dueDate": { "type": "string", "description": "Standardized deadline" },
+        "dueDateLabel": { "type": "string", "description": "Friendly colloquial Gujarati deadline label" },
+        "priority": { "type": "string", "enum": ["High", "Medium", "Low"] },
+        "status": { "type": "string", "enum": ["New", "In Progress", "Completed", "Pending Payment"] },
+        "suggestedNextAction": { "type": "string" },
+        "suggestedNextActionGujarati": { "type": "string" },
+        "whatsappMessage": { "type": "string", "description": "Gujarati WhatsApp dispatch draft" },
+        "whatsappMessageEnglish": { "type": "string", "description": "English translation of WhatsApp dispatch" },
+        "confidenceScore": { "type": "number", "description": "AI extraction confidence percentage" },
+        "detectedLanguage": { "type": "string", "description": "Identified dialect or language" },
+        "originalAudioText": { "type": "string", "description": "Original transcription or raw input text" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "customerName", "actionType", "status"]
+    }
+  }
+}

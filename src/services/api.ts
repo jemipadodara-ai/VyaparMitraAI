@@ -1,6 +1,30 @@
-import { ExtractedTaskData, UserAccount } from '../types';
+import { ExtractedTaskData, TaskStatus, UserAccount } from '../types';
+import {
+  fetchUsersFromFirestore,
+  saveUserToFirestore,
+  fetchTasksFromFirestore,
+  saveTaskToFirestore,
+  updateTaskStatusInFirestore,
+  deleteTaskFromFirestore,
+  clearUserTasksInFirestore,
+  subscribeToTasks,
+  subscribeToUsers,
+} from '../lib/firebase';
+
+export { subscribeToTasks, subscribeToUsers };
 
 export async function fetchUsersFromDb(): Promise<UserAccount[]> {
+  // 1. Try Cloud Firestore first
+  try {
+    const cloudUsers = await fetchUsersFromFirestore();
+    if (cloudUsers && cloudUsers.length > 0) {
+      return cloudUsers;
+    }
+  } catch (e) {
+    console.warn('Could not fetch users from Cloud Firestore, falling back to SQLite:', e);
+  }
+
+  // 2. Fallback to Express / SQLite backend
   try {
     const res = await fetch('/api/db/users');
     const data = await res.json();
@@ -14,21 +38,39 @@ export async function fetchUsersFromDb(): Promise<UserAccount[]> {
 }
 
 export async function createUserInDb(user: UserAccount): Promise<boolean> {
+  let cloudSuccess = false;
   try {
-    const res = await fetch('/api/db/users', {
+    cloudSuccess = await saveUserToFirestore(user);
+  } catch (e) {
+    console.warn('Error saving user to Cloud Firestore:', e);
+  }
+
+  // Dual-write to SQLite backend for offline durability
+  try {
+    await fetch('/api/db/users', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(user),
     });
-    const data = await res.json();
-    return !!data.success;
   } catch (err) {
     console.warn('Failed to save user to SQL backend:', err);
-    return false;
   }
+
+  return cloudSuccess;
 }
 
 export async function fetchTasksFromDb(userId: string): Promise<ExtractedTaskData[]> {
+  // 1. Try Cloud Firestore first
+  try {
+    const cloudTasks = await fetchTasksFromFirestore(userId);
+    if (cloudTasks && cloudTasks.length > 0) {
+      return cloudTasks;
+    }
+  } catch (e) {
+    console.warn('Could not fetch tasks from Cloud Firestore, falling back to SQLite:', e);
+  }
+
+  // 2. Fallback to Express / SQLite backend
   try {
     const res = await fetch(`/api/db/tasks?userId=${encodeURIComponent(userId)}`);
     const data = await res.json();
@@ -42,21 +84,36 @@ export async function fetchTasksFromDb(userId: string): Promise<ExtractedTaskDat
 }
 
 export async function saveTaskToDb(userId: string, task: ExtractedTaskData): Promise<boolean> {
+  let cloudSuccess = false;
   try {
-    const res = await fetch('/api/db/tasks', {
+    cloudSuccess = await saveTaskToFirestore(userId, task);
+  } catch (e) {
+    console.warn('Error saving task to Cloud Firestore:', e);
+  }
+
+  // Dual-write to SQLite backend for redundancy
+  try {
+    await fetch('/api/db/tasks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId, task }),
     });
-    const data = await res.json();
-    return !!data.success;
   } catch (err) {
     console.warn('Failed to save task to SQL backend:', err);
-    return false;
   }
+
+  return cloudSuccess;
 }
 
-export async function updateTaskStatusInDb(taskId: string, status: string): Promise<boolean> {
+export async function updateTaskStatusInDb(taskId: string, status: TaskStatus, userId?: string): Promise<boolean> {
+  if (userId) {
+    try {
+      await updateTaskStatusInFirestore(userId, taskId, status);
+    } catch (e) {
+      console.warn('Error updating task in Cloud Firestore:', e);
+    }
+  }
+
   try {
     const res = await fetch(`/api/db/tasks/${encodeURIComponent(taskId)}/status`, {
       method: 'PATCH',
@@ -71,7 +128,15 @@ export async function updateTaskStatusInDb(taskId: string, status: string): Prom
   }
 }
 
-export async function deleteTaskFromDb(taskId: string): Promise<boolean> {
+export async function deleteTaskFromDb(taskId: string, userId?: string): Promise<boolean> {
+  if (userId) {
+    try {
+      await deleteTaskFromFirestore(userId, taskId);
+    } catch (e) {
+      console.warn('Error deleting task in Cloud Firestore:', e);
+    }
+  }
+
   try {
     const res = await fetch(`/api/db/tasks/${encodeURIComponent(taskId)}`, {
       method: 'DELETE',
@@ -85,6 +150,12 @@ export async function deleteTaskFromDb(taskId: string): Promise<boolean> {
 }
 
 export async function clearUserTasksInDb(userId: string): Promise<boolean> {
+  try {
+    await clearUserTasksInFirestore(userId);
+  } catch (e) {
+    console.warn('Error clearing tasks from Cloud Firestore:', e);
+  }
+
   try {
     const res = await fetch(`/api/db/tasks/user/${encodeURIComponent(userId)}`, {
       method: 'DELETE',
